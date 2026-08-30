@@ -30,13 +30,14 @@
         aria-label="Offshore wind turbine transforming from fully assembled to fully disassembled, showing the nacelle opening and internal components separating."
       ></video>
 
-      <!-- fallback static image if video cannot load -->
+      <!-- Always-present base layer. The video paints on top of this once
+           it has decoded a frame; if it never loads, the learner still sees
+           the turbine instead of an empty stage. -->
       <img
         id="turbineFallback"
         class="turbine-frame__fallback"
         src="assets/turbine-assembled.jpg"
         alt="Fully assembled offshore wind turbine with three rotor blades and a closed nacelle, viewed against the open sea."
-        hidden
       />
 
       <div class="turbine-frame__vignette" aria-hidden="true"></div>

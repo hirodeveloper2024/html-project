@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Inside an Offshore Wind Turbine — Scroll-Driven Interactive (Standalone)</title>
+<title>Inside an Offshore Wind Turbine — Scroll-Driven Interactive</title>
 <meta name="description" content="A scroll-driven interactive that reveals how an offshore wind turbine converts wind into electricity, from assembled rotor to fully exposed drivetrain." />
 <style>
 /* ==========================================================================
@@ -146,8 +146,12 @@ button {
   justify-content: center;
 }
 
+/* Video and still occupy the same box with identical object-fit, so the
+   video registers exactly over the still and covers it once it paints. */
 .turbine-frame__video,
 .turbine-frame__fallback {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -156,10 +160,21 @@ button {
   pointer-events: none;
   user-select: none;
 }
+.turbine-frame__fallback {
+  z-index: 0;
+}
+.turbine-frame__video {
+  z-index: 1;
+}
+/* Source unusable: drop the empty video box so the still is what shows. */
+.turbine-frame.is-video-unavailable .turbine-frame__video {
+  display: none;
+}
 
 .turbine-frame__vignette {
   position: absolute;
   inset: 0;
+  z-index: 2;
   pointer-events: none;
   background:
     linear-gradient(to right, rgba(5, 7, 10, 0.7) 0%, rgba(5, 7, 10, 0.16) 32%, rgba(5, 7, 10, 0) 58%),
@@ -328,6 +343,7 @@ button {
 .hotspot-layer {
   position: absolute;
   inset: 0;
+  z-index: 3;
   opacity: 0;
   transition: opacity 0.6s var(--ease);
   pointer-events: none;
@@ -811,13 +827,14 @@ body.reduced-motion .scroll-cue {
         aria-label="Offshore wind turbine transforming from fully assembled to fully disassembled, showing the nacelle opening and internal components separating."
       ></video>
 
-      <!-- fallback static image if video cannot load -->
+      <!-- Always-present base layer. The video paints on top of this once
+           it has decoded a frame; if it never loads, the learner still sees
+           the turbine instead of an empty stage. -->
       <img
         id="turbineFallback"
         class="turbine-frame__fallback"
         src="assets/turbine-assembled.jpg"
         alt="Fully assembled offshore wind turbine with three rotor blades and a closed nacelle, viewed against the open sea."
-        hidden
       />
 
       <div class="turbine-frame__vignette" aria-hidden="true"></div>
@@ -1053,7 +1070,6 @@ body.reduced-motion .scroll-cue {
    * ------------------------------------------------------------------ */
   var stage = document.getElementById("stage");
   var video = document.getElementById("turbineVideo");
-  var fallback = document.getElementById("turbineFallback");
   var frame = document.getElementById("turbineFrame");
   var hotspotLayer = document.getElementById("hotspotLayer");
 
@@ -1082,6 +1098,7 @@ body.reduced-motion .scroll-cue {
 
   var videoReady = false;
   var videoDuration = 0;
+  var videoWatchdog = null;
   var hotspotsActive = false;
   var exploredIds = {};
   var selectedId = null;
@@ -1408,16 +1425,47 @@ body.reduced-motion .scroll-cue {
       document.body.classList.add("reduced-motion");
     }
 
-    video.addEventListener("loadedmetadata", function () {
+    // Metadata may ALREADY be available by the time this runs — with an
+    // inlined/data-URI source the browser can parse it before the script
+    // executes, and a `loadedmetadata` listener attached afterwards would
+    // never fire. Always check readyState first, then listen as a fallback.
+    function onVideoMetadata() {
+      if (videoReady) return;
       videoReady = true;
       videoDuration = video.duration || 0;
+      clearTimeout(videoWatchdog);
       syncHotspotLayerToVideo();
+      paintFirstFrame();
       if (!reduceMotion) updateFromProgress(getStageProgress());
-    });
+    }
+
+    if (video.readyState >= 1) {
+      onVideoMetadata();
+    } else {
+      video.addEventListener("loadedmetadata", onVideoMetadata);
+    }
+
+    // A video that has never been seeked or played renders nothing at all.
+    // At scroll 0 the target time is 0, so the normal scrub guard is a
+    // no-op and the element would stay blank — nudge it off zero once so
+    // the browser decodes and paints an actual first frame.
+    function paintFirstFrame() {
+      try {
+        video.currentTime = 0.04;
+      } catch (e) {
+        /* seek unsupported; the still image underneath remains visible */
+      }
+    }
+
+    // If the video never becomes usable (blocked source, unsupported
+    // codec), leave the still image showing rather than a blank stage.
+    videoWatchdog = setTimeout(function () {
+      if (!videoReady) frame.classList.add("is-video-unavailable");
+    }, 8000);
 
     video.addEventListener("error", function () {
-      fallback.hidden = false;
-      video.style.display = "none";
+      clearTimeout(videoWatchdog);
+      frame.classList.add("is-video-unavailable");
     });
 
     window.addEventListener("resize", function () {

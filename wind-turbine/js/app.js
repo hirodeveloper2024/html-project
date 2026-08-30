@@ -130,7 +130,6 @@
    * ------------------------------------------------------------------ */
   var stage = document.getElementById("stage");
   var video = document.getElementById("turbineVideo");
-  var fallback = document.getElementById("turbineFallback");
   var frame = document.getElementById("turbineFrame");
   var hotspotLayer = document.getElementById("hotspotLayer");
 
@@ -159,6 +158,7 @@
 
   var videoReady = false;
   var videoDuration = 0;
+  var videoWatchdog = null;
   var hotspotsActive = false;
   var exploredIds = {};
   var selectedId = null;
@@ -485,16 +485,47 @@
       document.body.classList.add("reduced-motion");
     }
 
-    video.addEventListener("loadedmetadata", function () {
+    // Metadata may ALREADY be available by the time this runs — with an
+    // inlined/data-URI source the browser can parse it before the script
+    // executes, and a `loadedmetadata` listener attached afterwards would
+    // never fire. Always check readyState first, then listen as a fallback.
+    function onVideoMetadata() {
+      if (videoReady) return;
       videoReady = true;
       videoDuration = video.duration || 0;
+      clearTimeout(videoWatchdog);
       syncHotspotLayerToVideo();
+      paintFirstFrame();
       if (!reduceMotion) updateFromProgress(getStageProgress());
-    });
+    }
+
+    if (video.readyState >= 1) {
+      onVideoMetadata();
+    } else {
+      video.addEventListener("loadedmetadata", onVideoMetadata);
+    }
+
+    // A video that has never been seeked or played renders nothing at all.
+    // At scroll 0 the target time is 0, so the normal scrub guard is a
+    // no-op and the element would stay blank — nudge it off zero once so
+    // the browser decodes and paints an actual first frame.
+    function paintFirstFrame() {
+      try {
+        video.currentTime = 0.04;
+      } catch (e) {
+        /* seek unsupported; the still image underneath remains visible */
+      }
+    }
+
+    // If the video never becomes usable (blocked source, unsupported
+    // codec), leave the still image showing rather than a blank stage.
+    videoWatchdog = setTimeout(function () {
+      if (!videoReady) frame.classList.add("is-video-unavailable");
+    }, 8000);
 
     video.addEventListener("error", function () {
-      fallback.hidden = false;
-      video.style.display = "none";
+      clearTimeout(videoWatchdog);
+      frame.classList.add("is-video-unavailable");
     });
 
     window.addEventListener("resize", function () {
