@@ -1,0 +1,798 @@
+/* ==========================================================================
+   Offshore Wind Turbine — Scroll-Driven Interactive
+   ========================================================================== */
+
+:root {
+  --bg: #05070a;
+  --bg-elevated: #0c1016;
+  --ink: #f5f6f7;
+  --ink-dim: rgba(245, 246, 247, 0.68);
+  /* 0.55 keeps eyebrows/captions at >=4.5:1 on --bg-elevated (WCAG 2.2 AA
+     1.4.3). At 0.42 they measured 3.88:1 and failed. */
+  --ink-faint: rgba(245, 246, 247, 0.55);
+  --accent: #5fb8ff;
+  --accent-ink: #06131f;
+  --line: rgba(255, 255, 255, 0.14);
+  --line-soft: rgba(255, 255, 255, 0.08);
+  --panel-bg: rgba(14, 18, 24, 0.86);
+  --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, p, ol, ul {
+  margin: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  background: var(--ink);
+  color: #05070a;
+  padding: 12px 18px;
+  border-radius: 0 0 10px 0;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.eyebrow {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+
+.lede {
+  font-size: clamp(1.02rem, 1.4vw, 1.2rem);
+  line-height: 1.55;
+  color: var(--ink-dim);
+  max-width: 34ch;
+  font-weight: 400;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: #05070a;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 13px 24px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease), background 0.25s var(--ease), opacity 0.25s var(--ease);
+}
+.btn:hover {
+  transform: translateY(-1px);
+}
+.btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+.btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   STAGE — the tall pinned scroll section
+   ========================================================================== */
+
+.stage {
+  position: relative;
+  height: 650vh;
+}
+
+.stage__sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: radial-gradient(120% 100% at 50% 12%, #101720 0%, #05070a 62%);
+}
+
+.turbine-frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Video and still occupy the same box with identical object-fit, so the
+   video registers exactly over the still and covers it once it paints. */
+.turbine-frame__video,
+.turbine-frame__fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+.turbine-frame__fallback {
+  z-index: 0;
+}
+.turbine-frame__video {
+  z-index: 1;
+}
+/* Source unusable: drop the empty video box so the still is what shows. */
+.turbine-frame.is-video-unavailable .turbine-frame__video {
+  display: none;
+}
+
+.turbine-frame__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(5, 7, 10, 0.7) 0%, rgba(5, 7, 10, 0.16) 32%, rgba(5, 7, 10, 0) 58%),
+    linear-gradient(to bottom, rgba(5, 7, 10, 0.55) 0%, rgba(5, 7, 10, 0) 22%, rgba(5, 7, 10, 0) 72%, rgba(5, 7, 10, 0.55) 100%);
+}
+
+/* ==========================================================================
+   OVERLAY narrative panels
+   ========================================================================== */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.overlay__panel {
+  position: absolute;
+  left: clamp(24px, 6vw, 88px);
+  right: clamp(24px, 6vw, 88px);
+  max-width: 620px;
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+  will-change: opacity, transform;
+}
+
+.overlay__panel.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.overlay__panel--hero {
+  top: 50%;
+  transform: translateY(calc(-50% + 18px));
+}
+.overlay__panel--hero.is-visible {
+  transform: translateY(-50%);
+}
+.overlay__panel--hero h1 {
+  font-size: clamp(1.9rem, 4.4vw, 3.1rem);
+  line-height: 1.14;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  margin-bottom: 18px;
+  max-width: 16ch;
+}
+
+.overlay__panel--discover {
+  top: 50%;
+  transform: translateY(calc(-50% + 18px));
+}
+.overlay__panel--discover.is-visible {
+  transform: translateY(-50%);
+}
+.overlay__panel--discover h2 {
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
+}
+
+.overlay__panel--caption {
+  left: 0;
+  right: 0;
+  bottom: clamp(28px, 6vh, 64px);
+  max-width: none;
+  display: flex;
+  justify-content: center;
+  transform: translateY(10px);
+}
+.overlay__panel--caption.is-visible {
+  transform: translateY(0);
+}
+.caption-text {
+  font-size: clamp(0.95rem, 1.6vw, 1.15rem);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--panel-bg);
+  border: 1px solid var(--line-soft);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 12px 22px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
+
+.overlay__panel--explore {
+  top: clamp(28px, 6vh, 56px);
+  transform: translateY(-12px);
+}
+.overlay__panel--explore.is-visible {
+  transform: translateY(0);
+}
+.overlay__panel--explore h2 {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-bottom: 10px;
+}
+.overlay__panel--explore .lede {
+  margin-bottom: 18px;
+}
+
+.progress-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-soft);
+  padding: 8px 16px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+.progress-pill span {
+  color: var(--ink);
+}
+
+.scroll-cue {
+  margin-top: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.scroll-cue span {
+  width: 20px;
+  height: 32px;
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 12px;
+  position: relative;
+  flex: none;
+}
+.scroll-cue span::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 3px;
+  height: 6px;
+  background: var(--ink-faint);
+  border-radius: 2px;
+  transform: translateX(-50%);
+  animation: scrollcue 1.8s ease-in-out infinite;
+}
+@keyframes scrollcue {
+  0% { opacity: 1; transform: translate(-50%, 0); }
+  60% { opacity: 0; transform: translate(-50%, 10px); }
+  100% { opacity: 0; transform: translate(-50%, 10px); }
+}
+
+/* ==========================================================================
+   HOTSPOTS
+   ========================================================================== */
+
+.hotspot-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.6s var(--ease);
+  pointer-events: none;
+}
+.hotspot-layer.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.hotspot-layer.is-dimmed .hotspot:not(.is-selected) .hotspot__ring {
+  opacity: 0.28;
+}
+
+.hotspot {
+  /* Fixed, small hit target centered on the marker point — deliberately
+     NOT sized by its label, so dense hotspots never steal taps meant for
+     a neighbor (the label is an absolutely-positioned, pointer-events:none
+     decoration, see below). 44px meets the recommended minimum touch size. */
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.hotspot__ring {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 2px solid rgba(5, 7, 10, 0.7);
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.16);
+  transition: transform 0.28s var(--ease), box-shadow 0.28s var(--ease), background 0.28s var(--ease), opacity 0.28s var(--ease);
+  flex: none;
+  position: relative;
+}
+.hotspot__ring::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+}
+.hotspot__ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(95, 184, 255, 0.55);
+  animation: hotspotPulse 2.6s ease-out infinite;
+}
+
+@keyframes hotspotPulse {
+  0% { box-shadow: 0 0 0 0 rgba(95, 184, 255, 0.45); }
+  70% { box-shadow: 0 0 0 14px rgba(95, 184, 255, 0); }
+  100% { box-shadow: 0 0 0 14px rgba(95, 184, 255, 0); }
+}
+
+.hotspot:hover .hotspot__ring,
+.hotspot:focus-visible .hotspot__ring {
+  transform: scale(1.35);
+  background: var(--accent);
+  box-shadow: 0 0 0 8px rgba(95, 184, 255, 0.22);
+}
+
+.hotspot.is-selected .hotspot__ring {
+  background: var(--accent);
+  transform: scale(1.35);
+}
+
+.hotspot.is-explored .hotspot__ring::before {
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+}
+
+.hotspot__label {
+  /* Absolutely positioned relative to the 44px hit target (not laid out
+     in flex flow) and pointer-events:none, so a visible-or-not label
+     never expands or steals a neighboring hotspot's clickable area. */
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  margin-left: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: rgba(6, 9, 13, 0.82);
+  border: 1px solid var(--line-soft);
+  padding: 7px 13px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(-6px);
+  transition: opacity 0.22s var(--ease), transform 0.22s var(--ease);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.hotspot:hover .hotspot__label,
+.hotspot:focus-visible .hotspot__label,
+.hotspot.is-selected .hotspot__label {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.hotspot--label-left .hotspot__label {
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 8px;
+  transform: translateY(-50%) translateX(6px);
+}
+.hotspot--label-left.hotspot:hover .hotspot__label,
+.hotspot--label-left.hotspot:focus-visible .hotspot__label,
+.hotspot--label-left.hotspot.is-selected .hotspot__label {
+  transform: translateY(-50%) translateX(0);
+}
+
+/* ==========================================================================
+   INFO PANEL
+   ========================================================================== */
+
+.panel-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 4, 6, 0.4);
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+.panel-scrim.is-visible {
+  opacity: 1;
+}
+
+.info-panel {
+  position: fixed;
+  top: 50%;
+  right: clamp(20px, 4vw, 64px);
+  transform: translateY(-50%) translateX(16px);
+  width: min(380px, calc(100vw - 40px));
+  max-height: min(560px, calc(100vh - 64px));
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  padding: 30px 28px 26px;
+  z-index: 41;
+  opacity: 0;
+  transition: opacity 0.32s var(--ease), transform 0.32s var(--ease);
+}
+.info-panel.is-visible {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.info-panel__close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.info-panel__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+}
+
+.info-panel__eyebrow {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+  padding-right: 30px;
+}
+
+.info-panel__title {
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-bottom: 22px;
+  padding-right: 20px;
+}
+
+.info-panel__section + .info-panel__section {
+  margin-top: 20px;
+}
+.info-panel__section h4 {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+.info-panel__section p {
+  font-size: 0.98rem;
+  line-height: 1.58;
+  color: var(--ink-dim);
+}
+
+.info-panel__nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+}
+.info-panel__nav-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.info-panel__nav-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ==========================================================================
+   RECAP
+   ========================================================================== */
+
+.recap {
+  background: var(--bg-elevated);
+  padding: clamp(80px, 14vh, 160px) clamp(24px, 6vw, 88px);
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--line-soft);
+}
+.recap__inner {
+  max-width: 640px;
+  width: 100%;
+}
+.recap h2 {
+  font-size: clamp(1.7rem, 3.4vw, 2.4rem);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-bottom: 34px;
+  max-width: 18ch;
+}
+.recap__list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 40px;
+}
+.recap__list li {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.recap__list li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.recap__num {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.recap__closer {
+  font-size: 1.1rem;
+  color: var(--ink);
+  font-weight: 550;
+  margin-bottom: 28px;
+}
+
+/* ==========================================================================
+   REDUCED MOTION CONTROLS
+   ========================================================================== */
+
+.rm-controls {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(28px, 6vh, 60px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  z-index: 5;
+}
+.rm-controls[hidden] {
+  display: none;
+}
+.rm-hint {
+  font-size: 1rem;
+  color: var(--ink-faint);
+  max-width: 34ch;
+}
+
+/* ==========================================================================
+   REDUCED MOTION MODE — simplified non-scroll-linked layout
+   ========================================================================== */
+
+body.reduced-motion .stage {
+  height: auto;
+}
+body.reduced-motion .stage__sticky {
+  position: relative;
+  height: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 72px clamp(24px, 6vw, 88px) 56px;
+}
+/* unwraps .overlay so its panels become direct flex items of .stage__sticky,
+   letting them interleave with .turbine-frame via `order` below */
+body.reduced-motion .overlay {
+  position: static;
+  inset: auto;
+  display: contents;
+}
+body.reduced-motion .overlay__panel {
+  position: static;
+  opacity: 1;
+  transform: none;
+  max-width: 640px;
+  pointer-events: auto;
+  transition: none;
+}
+body.reduced-motion .overlay__panel--hero {
+  order: 1;
+}
+body.reduced-motion .overlay__panel--discover,
+body.reduced-motion .overlay__panel--caption {
+  display: none;
+}
+body.reduced-motion .overlay__panel--explore {
+  order: 3;
+}
+body.reduced-motion .turbine-frame {
+  position: relative;
+  order: 2;
+  height: min(60vh, 520px);
+  min-height: 320px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+body.reduced-motion .rm-controls {
+  position: static;
+  transform: none;
+  order: 4;
+  align-items: flex-start;
+  text-align: left;
+}
+body.reduced-motion .scroll-cue {
+  display: none;
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 860px) {
+  .stage {
+    height: 720vh;
+  }
+  .overlay__panel {
+    max-width: none;
+  }
+  .overlay__panel--hero h1 {
+    max-width: none;
+  }
+  .info-panel {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 72vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    transform: translateY(100%);
+    padding: 22px 22px 30px;
+  }
+  .info-panel.is-visible {
+    transform: translateY(0);
+  }
+  .hotspot__label {
+    /* 14px floor — 0.78rem (12.5px) was too small to read on a phone. */
+    font-size: 0.875rem;
+    padding: 6px 10px;
+  }
+  /* Several components (generator, power converter, transformer, cooling
+     system) sit close together in the source imagery. A smaller touch
+     target — still within the WCAG AA 24px minimum — keeps neighboring
+     hotspots from overlapping and stealing each other's taps once the
+     video frame is this narrow. */
+  .hotspot {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 520px) {
+  .overlay__panel--hero h1 {
+    font-size: 1.7rem;
+  }
+  .caption-text {
+    font-size: 1rem;
+    padding: 10px 16px;
+    text-align: center;
+  }
+}
+
+/* ==========================================================================
+   PREFERS REDUCED MOTION (OS level) — respected regardless of JS
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay__panel {
+    transition: opacity 0.25s linear;
+  }
+  .hotspot__ring::after {
+    animation: none;
+  }
+  .scroll-cue span::after {
+    animation: none;
+  }
+}

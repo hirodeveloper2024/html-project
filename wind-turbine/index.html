@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Inside an Offshore Wind Turbine — Scroll-Driven Interactive</title>
+<meta name="description" content="A scroll-driven interactive that reveals how an offshore wind turbine converts wind into electricity, from assembled rotor to fully exposed drivetrain." />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<a class="skip-link" href="#stage">Skip to interactive experience</a>
+
+<!-- ============================================================
+     STAGE: hero + discover + disassemble + explore + components
+     A single pinned turbine visual persists through all of these.
+     ============================================================ -->
+<section id="stage" class="stage" aria-label="Offshore wind turbine interactive disassembly">
+
+  <div class="stage__sticky">
+
+    <div class="turbine-frame" id="turbineFrame">
+      <video
+        id="turbineVideo"
+        class="turbine-frame__video"
+        src="assets/turbine-flow.mp4"
+        muted
+        playsinline
+        preload="auto"
+        aria-label="Offshore wind turbine transforming from fully assembled to fully disassembled, showing the nacelle opening and internal components separating."
+      ></video>
+
+      <!-- Always-present base layer. The video paints on top of this once
+           it has decoded a frame; if it never loads, the learner still sees
+           the turbine instead of an empty stage. -->
+      <img
+        id="turbineFallback"
+        class="turbine-frame__fallback"
+        src="assets/turbine-assembled.jpg"
+        alt="Fully assembled offshore wind turbine with three rotor blades and a closed nacelle, viewed against the open sea."
+      />
+
+      <div class="turbine-frame__vignette" aria-hidden="true"></div>
+
+      <!-- Hotspot overlay: positioned relative to this frame, not the viewport -->
+      <div class="hotspot-layer" id="hotspotLayer" aria-hidden="true"></div>
+    </div>
+
+    <!-- Narrative overlay text, cross-fades by scroll progress -->
+    <div class="overlay">
+
+      <header class="overlay__panel overlay__panel--hero" id="panelHero">
+        <p class="eyebrow">Offshore Wind · Interactive</p>
+        <h1>How does an offshore wind turbine turn wind into electricity?</h1>
+        <p class="lede">Scroll to explore what happens inside the nacelle.</p>
+        <div class="scroll-cue" aria-hidden="true">
+          <span></span>
+          Scroll
+        </div>
+      </header>
+
+      <div class="overlay__panel overlay__panel--discover" id="panelDiscover">
+        <p class="eyebrow">01</p>
+        <h2>Inside the nacelle</h2>
+        <p class="lede">Everything that turns wind into power is housed behind this shell. Keep scrolling to open it up.</p>
+      </div>
+
+      <div class="overlay__panel overlay__panel--caption" id="panelCaption" aria-live="polite">
+        <p class="caption-text" id="captionText">Nacelle opening&hellip;</p>
+      </div>
+
+      <div class="overlay__panel overlay__panel--explore" id="panelExplore">
+        <p class="eyebrow">02</p>
+        <h2 id="exploreHeading">Explore the components</h2>
+        <p class="lede" id="exploreLede">Select a component to explore.</p>
+        <div class="progress-pill" id="progressPill" role="status" aria-live="polite">
+          <span id="progressCount">0</span> of <span id="progressTotal">9</span> explored
+        </div>
+        <button type="button" class="btn btn--ghost" id="replayBtn" hidden>Replay disassembly</button>
+      </div>
+
+    </div>
+
+    <!-- Reduced-motion controls (only shown when animation is simplified) -->
+    <div class="rm-controls" id="rmControls" hidden>
+      <button type="button" class="btn" id="rmPlayBtn">Play disassembly</button>
+      <p class="rm-hint">Reduced motion is enabled, so the disassembly plays as a simple video instead of a scroll animation.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     RECAP
+     ============================================================ -->
+<section class="recap" id="recap" aria-label="Summary">
+  <div class="recap__inner">
+    <p class="eyebrow">Recap</p>
+    <h2>Wind becomes electricity in five steps</h2>
+    <ol class="recap__list">
+      <li><span class="recap__num">1</span><span>Blades capture wind and spin the rotor and hub.</span></li>
+      <li><span class="recap__num">2</span><span>The main shaft, supported by the main bearing, carries that rotation into the nacelle.</span></li>
+      <li><span class="recap__num">3</span><span>The gearbox increases rotational speed for the generator.</span></li>
+      <li><span class="recap__num">4</span><span>The generator converts mechanical rotation into electrical energy.</span></li>
+      <li><span class="recap__num">5</span><span>The power converter and transformer condition and step up the electricity for transmission to shore.</span></li>
+    </ol>
+    <p class="recap__closer">You've explored the main systems inside the nacelle.</p>
+    <button type="button" class="btn btn--ghost" id="recapReplayBtn">Replay disassembly</button>
+  </div>
+</section>
+
+<!-- ============================================================
+     INFO PANEL (dialog) — desktop: side card, mobile: bottom sheet
+     ============================================================ -->
+<div class="panel-scrim" id="panelScrim" hidden></div>
+<div
+  class="info-panel"
+  id="infoPanel"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="infoPanelTitle"
+  hidden
+>
+  <button type="button" class="info-panel__close" id="infoPanelClose" aria-label="Close component information">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 5L19 19M19 5L5 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <p class="info-panel__eyebrow" id="infoPanelEyebrow">Component</p>
+  <h3 class="info-panel__title" id="infoPanelTitle">Component name</h3>
+  <div class="info-panel__section">
+    <h4>What it does</h4>
+    <p id="infoPanelWhat"></p>
+  </div>
+  <div class="info-panel__section">
+    <h4>Why it matters</h4>
+    <p id="infoPanelWhy"></p>
+  </div>
+  <nav class="info-panel__nav" aria-label="Other components">
+    <button type="button" class="info-panel__nav-btn" id="infoPanelPrev" aria-label="Previous component">&larr;</button>
+    <button type="button" class="info-panel__nav-btn" id="infoPanelNext" aria-label="Next component">&rarr;</button>
+  </nav>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
