@@ -15,7 +15,9 @@
   --bg-elevated: #0c1016;
   --ink: #f5f6f7;
   --ink-dim: rgba(245, 246, 247, 0.68);
-  --ink-faint: rgba(245, 246, 247, 0.42);
+  /* 0.55 keeps eyebrows/captions at >=4.5:1 on --bg-elevated (WCAG 2.2 AA
+     1.4.3). At 0.42 they measured 3.88:1 and failed. */
+  --ink-faint: rgba(245, 246, 247, 0.55);
   --accent: #5fb8ff;
   --accent-ink: #06131f;
   --line: rgba(255, 255, 255, 0.14);
@@ -286,7 +288,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--ink-dim);
   background: rgba(255, 255, 255, 0.06);
@@ -634,7 +636,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--ink);
 }
@@ -665,7 +667,7 @@ button {
   display: none;
 }
 .rm-hint {
-  font-size: 0.82rem;
+  font-size: 1rem;
   color: var(--ink-faint);
   max-width: 34ch;
 }
@@ -761,7 +763,8 @@ body.reduced-motion .scroll-cue {
     transform: translateY(0);
   }
   .hotspot__label {
-    font-size: 0.78rem;
+    /* 14px floor — 0.78rem (12.5px) was too small to read on a phone. */
+    font-size: 0.875rem;
     padding: 6px 10px;
   }
   /* Several components (generator, power converter, transformer, cooling
@@ -780,7 +783,7 @@ body.reduced-motion .scroll-cue {
     font-size: 1.7rem;
   }
   .caption-text {
-    font-size: 0.85rem;
+    font-size: 1rem;
     padding: 10px 16px;
     text-align: center;
   }
